@@ -1,0 +1,244 @@
+[gd_scene load_steps=19 format=3 uid="uid://dgtgit8yqfqbw"]
+
+[ext_resource type="Script" uid="uid://dj6c58ni0k43j" path="res://dog.gd" id="1_c5eso"]
+[ext_resource type="AudioStream" uid="uid://2em5kelynrkg" path="res://woof.wav" id="2_kb3ao"]
+
+[sub_resource type="StandardMaterial3D" id="Material_Brown_Dog"]
+albedo_color = Color(0.6, 0.4, 0.2, 1)
+
+[sub_resource type="CylinderMesh" id="LimbSegmentMesh_dog"]
+top_radius = 0.08
+bottom_radius = 0.08
+height = 0.3
+
+[sub_resource type="StandardMaterial3D" id="Material_LightBrown_Paws"]
+albedo_color = Color(0.248042, 0.140053, 0.0440561, 1)
+
+[sub_resource type="SphereMesh" id="PawMesh_dog"]
+radius = 0.21
+height = 0.27
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_ig7tw"]
+top_radius = 0.26
+bottom_radius = 0.38
+height = 1.0
+
+[sub_resource type="CylinderMesh" id="TailMesh_dog"]
+top_radius = 0.14
+bottom_radius = 0.03
+height = 0.5
+
+[sub_resource type="SphereMesh" id="HeadMesh_dog"]
+radius = 0.35
+height = 0.7
+
+[sub_resource type="StandardMaterial3D" id="Material_DarkBrown_Snout"]
+albedo_color = Color(0.465681, 0.320708, 0.176277, 1)
+
+[sub_resource type="BoxMesh" id="SnoutMesh_dog"]
+size = Vector3(0.24, 0.16, 0.36)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_7dm0k"]
+albedo_color = Color(0.112205, 0.0419657, 0.0027864, 1)
+
+[sub_resource type="StandardMaterial3D" id="Material_Black_NoseTip"]
+albedo_color = Color(0.466909, 0.312933, 0.134243, 1)
+
+[sub_resource type="BoxMesh" id="BoxMesh_7dm0k"]
+size = Vector3(0.19, 0.13, 0.26)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ig7tw"]
+albedo_color = Color(0.838382, 0.249676, 0.276936, 1)
+
+[sub_resource type="BoxMesh" id="EarMesh_dog"]
+size = Vector3(0.2, 0.3, 0.05)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_0xm2m"]
+albedo_color = Color(0.2822, 0.193202, 0.0578202, 1)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_h2yge"]
+top_radius = 0.05
+bottom_radius = 0.1
+height = 0.11
+
+[node name="Dog" type="Node3D"]
+script = ExtResource("1_c5eso")
+spring_strength = 500.0
+head_spring_strength = 400.0
+head_damping = 15.0
+head_max_displacement = 30.0
+
+[node name="FrontLeftShoulderPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 1.05155, 0.35)
+
+[node name="FrontLeftUpperLeg" type="MeshInstance3D" parent="FrontLeftShoulderPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="FrontLeftKneePivot" type="Node3D" parent="FrontLeftShoulderPivot/FrontLeftUpperLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="FrontLeftLowerLeg" type="MeshInstance3D" parent="FrontLeftShoulderPivot/FrontLeftUpperLeg/FrontLeftKneePivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="FrontLeftPawPivot" type="Node3D" parent="FrontLeftShoulderPivot/FrontLeftUpperLeg/FrontLeftKneePivot/FrontLeftLowerLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="FrontLeftPaw" type="MeshInstance3D" parent="FrontLeftShoulderPivot/FrontLeftUpperLeg/FrontLeftKneePivot/FrontLeftLowerLeg/FrontLeftPawPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0099934, 0)
+material_override = SubResource("Material_LightBrown_Paws")
+mesh = SubResource("PawMesh_dog")
+
+[node name="FrontRightShoulderPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 1.05155, 0.35)
+
+[node name="FrontRightUpperLeg" type="MeshInstance3D" parent="FrontRightShoulderPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="FrontRightKneePivot" type="Node3D" parent="FrontRightShoulderPivot/FrontRightUpperLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="FrontRightLowerLeg" type="MeshInstance3D" parent="FrontRightShoulderPivot/FrontRightUpperLeg/FrontRightKneePivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="FrontRightPawPivot" type="Node3D" parent="FrontRightShoulderPivot/FrontRightUpperLeg/FrontRightKneePivot/FrontRightLowerLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="FrontRightPaw" type="MeshInstance3D" parent="FrontRightShoulderPivot/FrontRightUpperLeg/FrontRightKneePivot/FrontRightLowerLeg/FrontRightPawPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0099934, 0)
+material_override = SubResource("Material_LightBrown_Paws")
+mesh = SubResource("PawMesh_dog")
+
+[node name="BackLeftHipPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.2, 1.05155, -0.35)
+
+[node name="BackLeftUpperLeg" type="MeshInstance3D" parent="BackLeftHipPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="BackLeftKneePivot" type="Node3D" parent="BackLeftHipPivot/BackLeftUpperLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="BackLeftLowerLeg" type="MeshInstance3D" parent="BackLeftHipPivot/BackLeftUpperLeg/BackLeftKneePivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="BackLeftPawPivot" type="Node3D" parent="BackLeftHipPivot/BackLeftUpperLeg/BackLeftKneePivot/BackLeftLowerLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="BackLeftPaw" type="MeshInstance3D" parent="BackLeftHipPivot/BackLeftUpperLeg/BackLeftKneePivot/BackLeftLowerLeg/BackLeftPawPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.0099934, 0)
+material_override = SubResource("Material_LightBrown_Paws")
+mesh = SubResource("PawMesh_dog")
+
+[node name="BackRightHipPivot" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.2, 1.05155, -0.35)
+
+[node name="BackRightUpperLeg" type="MeshInstance3D" parent="BackRightHipPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="BackRightKneePivot" type="Node3D" parent="BackRightHipPivot/BackRightUpperLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="BackRightLowerLeg" type="MeshInstance3D" parent="BackRightHipPivot/BackRightUpperLeg/BackRightKneePivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("LimbSegmentMesh_dog")
+
+[node name="BackRightPawPivot" type="Node3D" parent="BackRightHipPivot/BackRightUpperLeg/BackRightKneePivot/BackRightLowerLeg"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.15, 0)
+
+[node name="BackRightPaw" type="MeshInstance3D" parent="BackRightHipPivot/BackRightUpperLeg/BackRightKneePivot/BackRightLowerLeg/BackRightPawPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.00459194, 0.0099934, -0.00311482)
+material_override = SubResource("Material_LightBrown_Paws")
+mesh = SubResource("PawMesh_dog")
+
+[node name="Torso" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 1.1, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("CylinderMesh_ig7tw")
+
+[node name="TailBasePivot" type="Node3D" parent="Torso"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, -0.48, -0.2)
+
+[node name="Tail" type="MeshInstance3D" parent="Torso/TailBasePivot"]
+transform = Transform3D(1, 0, 0, 0, 0.748104, 0.663567, 0, -0.663567, 0.748104, 0, 0.301593, -0.12057)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("TailMesh_dog")
+
+[node name="HeadPivot" type="Node3D" parent="Torso"]
+transform = Transform3D(1, 0, 0, 0, -4.37114e-08, 1, 0, -1, -4.37114e-08, 0, 0.45, -0.25)
+
+[node name="Head" type="MeshInstance3D" parent="Torso/HeadPivot"]
+transform = Transform3D(1.30057, 0, 0, 0, 1.30057, 0, 0, 0, 1.30057, 0, 0.3, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("HeadMesh_dog")
+
+[node name="SnoutPivot" type="Node3D" parent="Torso/HeadPivot/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0500002, 0.232746)
+
+[node name="Snout" type="MeshInstance3D" parent="Torso/HeadPivot/Head/SnoutPivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.0812992)
+material_override = SubResource("Material_DarkBrown_Snout")
+mesh = SubResource("SnoutMesh_dog")
+
+[node name="Snout3" type="MeshInstance3D" parent="Torso/HeadPivot/Head/SnoutPivot/Snout"]
+transform = Transform3D(0.450927, 0, 0, 0, 0.516825, 0, 0, 0, 0.216217, 0, 0.0582236, 0.16385)
+material_override = SubResource("StandardMaterial3D_7dm0k")
+mesh = SubResource("SnoutMesh_dog")
+skeleton = NodePath("../../..")
+
+[node name="Snout2Pivot" type="Node3D" parent="Torso/HeadPivot/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.175101, 0.232746)
+
+[node name="Snout2" type="MeshInstance3D" parent="Torso/HeadPivot/Head/Snout2Pivot"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0.0812992)
+material_override = SubResource("Material_Black_NoseTip")
+mesh = SubResource("BoxMesh_7dm0k")
+
+[node name="Snout3" type="MeshInstance3D" parent="Torso/HeadPivot/Head/Snout2Pivot/Snout2"]
+transform = Transform3D(0.765789, 0, 0, 0, 0.887456, 0, 0, 0, 0.761273, 0, 0.0223674, 0)
+material_override = SubResource("StandardMaterial3D_ig7tw")
+mesh = SubResource("BoxMesh_7dm0k")
+skeleton = NodePath("../../..")
+
+[node name="LeftEarPivot" type="Node3D" parent="Torso/HeadPivot/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.3, 0.15, 0.05)
+
+[node name="LeftEar" type="MeshInstance3D" parent="Torso/HeadPivot/Head/LeftEarPivot"]
+transform = Transform3D(1, 0, 0, 0, 0.9397, -0.342, 0, 0.342, 0.9397, 0, 0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("EarMesh_dog")
+
+[node name="RightEarPivot" type="Node3D" parent="Torso/HeadPivot/Head"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.3, 0.15, 0.05)
+
+[node name="RightEar" type="MeshInstance3D" parent="Torso/HeadPivot/Head/RightEarPivot"]
+transform = Transform3D(1, 0, 0, 0, 0.9397, -0.342, 0, 0.342, 0.9397, 0, 0.15, 0)
+material_override = SubResource("Material_Brown_Dog")
+mesh = SubResource("EarMesh_dog")
+
+[node name="Eye1" type="MeshInstance3D" parent="Torso/HeadPivot/Head"]
+transform = Transform3D(0.68724, -0.726431, 6.35066e-08, 3.17533e-08, -5.73826e-08, -1, 0.726431, 0.68724, -1.6369e-08, -0.209389, 0.0648925, 0.23138)
+material_override = SubResource("StandardMaterial3D_0xm2m")
+mesh = SubResource("CylinderMesh_h2yge")
+
+[node name="Eye2" type="MeshInstance3D" parent="Torso/HeadPivot/Head"]
+transform = Transform3D(0.699663, 0.714473, -6.24612e-08, -3.12306e-08, -5.68395e-08, -1, -0.714473, 0.699663, -1.74551e-08, 0.218024, 0.0648925, 0.23138)
+material_override = SubResource("StandardMaterial3D_0xm2m")
+mesh = SubResource("CylinderMesh_h2yge")
+
+[node name="BarkSound" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("2_kb3ao")
+volume_db = 1.3
