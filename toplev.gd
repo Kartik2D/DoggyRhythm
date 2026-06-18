@@ -65,7 +65,7 @@ var lessons: Array = [
 		"ticker": true,
 		"repeat": 3,
 		"intro": [
-			"Watch the spinnin' dot — that's the beat.",
+			"Watch the spinnin' dot, that's the beat.",
 			"I bark a rhythm, then you 'n' Pip bark it right back.",
 			"Easy one first: a bark on every beat.",
 		],
@@ -89,7 +89,7 @@ var lessons: Array = [
 		"repeat": 3,
 		"intro": [
 			"Feelin' bouncy? Let's go double-time.",
-			"Quick lil' barks now — stick with Pip!",
+			"Quick lil' barks now, stick with Pip!",
 		],
 		"patterns": [
 			[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
@@ -113,7 +113,7 @@ var lessons: Array = [
 		"intro": [
 			"Alright, hotshot. Real dogs don't need the dot.",
 			"Ticker's GONE. Just ears, heart, and snoot.",
-			"Back to basics — one bark a beat. You got this.",
+			"Back to basics, one bark a beat. You got this.",
 		],
 		"patterns": [
 			[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
@@ -124,7 +124,7 @@ var lessons: Array = [
 		"repeat": 3,
 		"intro": [
 			"Look at you! Beat's in your bones now.",
-			"Double-time again — eyes closed, ears wide.",
+			"Double-time again, eyes closed, ears wide.",
 		],
 		"patterns": [
 			[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
@@ -135,7 +135,7 @@ var lessons: Array = [
 		"repeat": 3,
 		"intro": [
 			"One more warm-up, then the big leagues.",
-			"Sneaky syncopation — no net, just ears.",
+			"Sneaky syncopation, no net, just ears.",
 		],
 		"patterns": [
 			[1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
@@ -150,7 +150,7 @@ var lessons: Array = [
 		"intro": [
 			"Okay pup. THIS one's for the record books.",
 			"Starts gentle, then we crank it up. No dot, no net.",
-			"Everything you've learned — make the park HOWL!",
+			"Everything you've learned, make the park HOWL!",
 		],
 		"patterns": [
 			[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],   # warm: one bark a beat
@@ -799,7 +799,7 @@ func _start_score_dialogue(grade: String, accuracy: float, mean_error: float) ->
 
 	_start_dialogue(DialogueMode.SCORE, [
 		"And... paws down. What a show.",
-		"Grade %s — %.0f%% good-dog accuracy." % [grade, accuracy * 100.0],
+		"Grade %s, %.0f%% good-dog accuracy." % [grade, accuracy * 100.0],
 		"Perfect %d, Good %d, Oops %d." % [total_perfect_count, total_good_count, total_miss_count],
 		timing_text,
 		"SPACE to run it back, good dog."
