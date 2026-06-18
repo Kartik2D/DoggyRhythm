@@ -1,9 +1,11 @@
 extends Control
 
 # Game States
-enum GameState { INTRO, FREE_BARK, PRACTICE, MAIN_GAME, SCORE }
+enum GameState { INTRO, FREE_BARK, LESSON, SCORE }
 var current_state: GameState = GameState.INTRO
-enum DialogueMode { NONE, INTRO, PRACTICE_INTRO, MAIN_INTRO, SCORE }
+enum DialogueMode { NONE, OPENING, LESSON_INTRO, SCORE }
+# Sub-steps within a single lesson's call-and-response loop.
+enum LessonStep { COUNT_IN, CALL, RESPONSE, OUTRO }
 
 # UI Elements
 var hold_timer: float = 0.0
@@ -33,10 +35,9 @@ const DESIGN_VIEWPORT_SIZE := Vector2i(288, 162)
 const DESIGN_ASPECT := 16.0 / 9.0
 const MIN_PIXEL_SCALE := 2
 const MAX_PIXEL_SCALE := 12
-const PRACTICE_PATTERN := [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0]
 const FREE_BARK_BARS := 4
-const PRACTICE_READY_BARS := 3
-const PRACTICE_ROUNDS := 3
+const COUNT_IN_BARS := 1
+const OUTRO_BARS := 1
 
 var dialogue_mode: DialogueMode = DialogueMode.NONE
 var dialogue_lines: Array[String] = []
@@ -50,45 +51,117 @@ var _band_layout_ready: bool = false
 var _camera_base_transform: Transform3D
 var _camera_base_fov: float = 45.0
 
-@export var drum_patterns: Array = [
-	# 16-step patterns (1 = bark, 0 = rest) - Progressive difficulty with repetition for better pacing
-	[1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],   # 1: Single note
-	[1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],   # 2: Single note (repeat)
-	[1,0,0,0, 0,0,0,0, 1,0,0,0, 1,0,0,0],   # 3: Two quarter notes
-	[1,0,0,0, 0,0,0,0, 1,0,0,0, 1,0,0,0],   # 4: Two quarter notes (repeat)
-	[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],   # 5: Basic quarter notes
-	[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],   # 6: Basic quarter notes (repeat)
-	[1,0,1,0, 1,0,1,0, 0,0,0,0, 0,0,0,0],   # 7: Simple eighth notes
-	[1,0,1,0, 1,0,1,0, 0,0,0,0, 0,0,0,0],   # 8: Simple eighth notes (repeat)
-	[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],   # 9: Full eighth notes pulse
-	[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],   # 10: Full eighth notes pulse (repeat)
-	[1,0,0,1, 1,0,0,1, 0,0,0,0, 0,0,0,0],   # 11: Off-beat introduction
-	[1,0,0,1, 1,0,0,1, 0,0,0,0, 0,0,0,0],   # 12: Off-beat introduction (repeat)
-	[1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],   # 13: Simple syncopation
-	[1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],   # 14: Simple syncopation (repeat)
-	[1,1,0,0, 1,0,1,0, 1,1,0,0, 1,0,1,0],   # 15: Mixed rhythms
-	[1,0,1,1, 0,1,0,1, 1,0,1,1, 0,1,0,1],   # 16: Complex syncopation
-	[1,1,0,1, 1,0,1,0, 0,1,1,0, 1,0,1,1],   # 17: Advanced pattern
-	[0,0,0,1, 1,0,0,0, 0,0,0,1, 1,0,0,0],   # 18: Anticipated downbeats
-	[0,0,0,1, 1,0,0,0, 0,0,0,1, 1,0,0,0],   # 19: Anticipated downbeats (repeat)
-	[0,1,0,0, 0,1,0,0, 0,1,0,0, 0,1,0,0],   # 20: Upbeat "e" accents
-	[0,1,0,0, 0,1,0,0, 0,1,0,0, 0,1,0,0],   # 21: Upbeat "e" accents (repeat)
-	[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],   # 22: Offbeat "&" skank
-	[0,0,1,0, 0,0,1,0, 0,0,1,0, 0,0,1,0],   # 23: Offbeat "&" skank (repeat)
-	[1,0,0,1, 0,0,0,0, 1,0,0,1, 0,0,0,0],   # 24: Dotted quarter feel
-	[1,0,0,1, 0,0,0,0, 1,0,0,1, 0,0,0,0],   # 25: Dotted quarter feel (repeat)
-	[1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],   # 26: Syncopated backbeat
-	[1,0,0,0, 0,0,1,0, 1,0,0,0, 0,0,1,0],   # 27: Syncopated backbeat (repeat)
-	[1,0,1,0, 0,1,0,1, 1,0,1,0, 0,1,0,1],   # 28: Three-note syncopated groups
-	[1,0,1,0, 0,1,0,1, 1,0,1,0, 0,1,0,1],   # 29: Three-note syncopated groups (repeat)
-	[1,0,0,0, 0,0,1,0, 0,0,0,1, 1,0,0,0],   # 30: Clave 3-2 feel
-	[0,0,0,1, 1,0,0,0, 0,0,1,0, 0,1,0,0],   # 31: Clave 2-3 feel
-	[1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0],   # 32: Hemiola displacement
-	[1,0,0,1, 0,0,1,0, 0,1,0,0, 1,0,0,0],   # 33: Hemiola displacement (repeat)
-	[0,1,0,0, 1,0,0,1, 0,0,1,0, 1,0,1,0],   # 34: Displaced accent weave
-	[0,1,0,0, 1,0,0,1, 0,0,1,0, 1,0,1,0],   # 35: Displaced accent weave (repeat)
-	[0,1,1,0, 1,0,0,1, 0,1,0,1, 1,0,1,0],   # 36: Dense syncopation
-	[1,0,0,1, 0,1,1,0, 0,0,1,1, 0,1,0,1],   # 37: Final boss syncopation
+# The whole game is a sequence of lessons. Each lesson is a short
+# call-and-response set: Big Dog barks a pattern (CALL), then you and Pip
+# (the helper dog) bark it back (RESPONSE). Tutorial lessons show the spinning
+# ticker; the finale lessons hide it so you have to play by ear.
+# Patterns are 16 sixteenth-steps (1 = bark, 0 = rest); beats are at 0,4,8,12.
+#   "repeat" : how many times the pattern list loops (3 helps a groove sink in).
+#   "ticker" : show the spinning timing wheel.
+#   "graded" : only graded lessons count toward the final score.
+var lessons: Array = [
+	# --- Tutorial: ticker ON, build from a steady pulse up to syncopation ---
+	{
+		"ticker": true,
+		"repeat": 3,
+		"intro": [
+			"Watch the spinnin' dot — that's the beat.",
+			"I bark a rhythm, then you 'n' Pip bark it right back.",
+			"Easy one first: a bark on every beat.",
+		],
+		"patterns": [
+			[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+		],
+	},
+	{
+		"ticker": true,
+		"repeat": 3,
+		"intro": [
+			"Good pup! Now leave a lil' room to breathe.",
+			"Fewer barks. Listen close, then echo me.",
+		],
+		"patterns": [
+			[1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],
+		],
+	},
+	{
+		"ticker": true,
+		"repeat": 3,
+		"intro": [
+			"Feelin' bouncy? Let's go double-time.",
+			"Quick lil' barks now — stick with Pip!",
+		],
+		"patterns": [
+			[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+		],
+	},
+	{
+		"ticker": true,
+		"repeat": 3,
+		"intro": [
+			"Ooh la la. Time for SYN-CO-PA-TION.",
+			"Barks sneak between the beats. Trust your ears.",
+		],
+		"patterns": [
+			[1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+		],
+	},
+	# --- Finale practice: ticker OFF, basics again then build back up, by ear ---
+	{
+		"ticker": false,
+		"repeat": 3,
+		"intro": [
+			"Alright, hotshot. Real dogs don't need the dot.",
+			"Ticker's GONE. Just ears, heart, and snoot.",
+			"Back to basics — one bark a beat. You got this.",
+		],
+		"patterns": [
+			[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],
+		],
+	},
+	{
+		"ticker": false,
+		"repeat": 3,
+		"intro": [
+			"Look at you! Beat's in your bones now.",
+			"Double-time again — eyes closed, ears wide.",
+		],
+		"patterns": [
+			[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],
+		],
+	},
+	{
+		"ticker": false,
+		"repeat": 3,
+		"intro": [
+			"One more warm-up, then the big leagues.",
+			"Sneaky syncopation — no net, just ears.",
+		],
+		"patterns": [
+			[1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],
+		],
+	},
+	# --- THE FINAL: ticker OFF, graded. This is the only scored section.
+	# A through-composed run that starts simple and ramps up to the hard stuff. ---
+	{
+		"ticker": false,
+		"graded": true,
+		"repeat": 1,
+		"intro": [
+			"Okay pup. THIS one's for the record books.",
+			"Starts gentle, then we crank it up. No dot, no net.",
+			"Everything you've learned — make the park HOWL!",
+		],
+		"patterns": [
+			[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],   # warm: one bark a beat
+			[1,0,0,0, 1,0,0,0, 1,0,0,0, 1,0,0,0],   # again, settle in
+			[1,0,0,0, 0,0,0,0, 1,0,0,0, 0,0,0,0],   # leave space
+			[1,0,1,0, 1,0,1,0, 1,0,1,0, 1,0,1,0],   # double-time eighths
+			[1,0,0,1, 1,0,0,1, 0,0,0,0, 0,0,0,0],   # off-beat push
+			[1,0,0,1, 0,0,1,0, 1,0,0,1, 0,0,1,0],   # syncopated groove
+			[1,0,1,0, 0,1,0,1, 1,0,0,1, 0,1,0,0],   # full howl
+		],
+	},
 ]
 
 # Hit detection constants (in seconds)
@@ -129,8 +202,14 @@ enum HitType { PERFECT, GOOD_EARLY, GOOD_LATE, MISS_EARLY, MISS_LATE, MISS_NO_HI
 enum Phase { CALL, RESPONSE }
 var phase: Phase = Phase.CALL
 
-# Pattern handling
-var current_pattern_index: int = 0
+# Lesson / pattern handling
+var current_lesson_index: int = -1
+var lesson_patterns: Array = []
+var lesson_pattern_index: int = 0
+var lesson_step: LessonStep = LessonStep.COUNT_IN
+var lesson_bars_remaining: int = 0
+var show_ticker: bool = true
+var lesson_graded: bool = false
 var current_pattern: Array
 
 # Timing helpers
@@ -194,9 +273,6 @@ var _big_dog_current_target_is_player: bool = true
 var beat_feedback_colors: Array[Color] = []  # Colors for each of the 16 beat positions
 var beat_revealed: Array[bool] = []  # Track which beats have been revealed by the big dog
 var free_bark_bars_remaining: int = 0
-var practice_ready_bars_remaining: int = 0
-var practice_active: bool = false
-var practice_rounds_remaining: int = 0
 var _pointer_held: bool = false
 var _last_pointer_press_msec: int = -1000
 
@@ -541,17 +617,9 @@ func change_state(new_state: GameState):
 				timing_indicator.visible = false
 			start_free_bark()
 		
-		GameState.PRACTICE:
+		GameState.LESSON:
 			game_ui.visible = true
-			if timing_indicator:
-				timing_indicator.visible = true
-			start_practice()
-		
-		GameState.MAIN_GAME:
-			game_ui.visible = true
-			if timing_indicator:
-				timing_indicator.visible = true
-			start_main_game()
+			start_lesson()
 		
 		GameState.SCORE:
 			score_ui.visible = true
@@ -581,8 +649,25 @@ func _ensure_conductor() -> void:
 	conductor.beats_per_bar = BEATS_PER_BAR
 	conductor.steps_per_beat = STEPS_PER_BEAT
 
+func _reset_total_stats() -> void:
+	total_perfect_count = 0
+	total_good_count = 0
+	total_miss_count = 0
+	total_hit_error_acc = 0.0
+	total_hits_count = 0
+
+func _reset_pattern_stats() -> void:
+	perfect_count = 0
+	good_count = 0
+	miss_count = 0
+	hit_error_acc = 0.0
+	total_hits = 0
+
 func start_free_bark() -> void:
 	_ensure_conductor()
+	# The warm-up kicks off a fresh run, so wipe the score here.
+	_reset_total_stats()
+	current_lesson_index = -1
 	free_bark_bars_remaining = FREE_BARK_BARS
 	last_processed_step = -1
 	current_16th_position = 0
@@ -593,17 +678,44 @@ func start_free_bark() -> void:
 	if dog1:
 		dog1.look_at_target = look_target_node
 	if dog2:
-		dog2.look_at_target = big_dog
+		dog2.look_at_target = dog1
 	conductor.play()
 	_set_status_text("GO WILD!", false)
 
-func start_practice() -> void:
+func _finish_free_bark() -> void:
+	_advance_to_next_lesson()
+
+# Moves to the next lesson: shows its intro dialogue, or rolls the score if the
+# pack has run out of tricks to teach.
+func _advance_to_next_lesson() -> void:
+	current_lesson_index += 1
+	if current_lesson_index >= lessons.size():
+		change_state(GameState.SCORE)
+		return
+
+	var intro: Array = lessons[current_lesson_index].get("intro", [])
+	var lines: Array[String] = []
+	for line in intro:
+		lines.append(str(line))
+	_begin_dialogue_section(DialogueMode.LESSON_INTRO, lines)
+
+func start_lesson() -> void:
 	_ensure_conductor()
-	practice_ready_bars_remaining = PRACTICE_READY_BARS
-	practice_active = false
-	practice_rounds_remaining = PRACTICE_ROUNDS
-	current_pattern = PRACTICE_PATTERN.duplicate()
+	var lesson: Dictionary = lessons[current_lesson_index]
+	show_ticker = bool(lesson.get("ticker", true))
+	lesson_graded = bool(lesson.get("graded", false))
+	# Loop the pattern list so a groove has time to sink in.
+	var base_patterns: Array = lesson.get("patterns", [])
+	var repeat: int = maxi(1, int(lesson.get("repeat", 1)))
+	lesson_patterns = []
+	for _r in range(repeat):
+		for pattern in base_patterns:
+			lesson_patterns.append(pattern)
+	lesson_pattern_index = 0
+	lesson_step = LessonStep.COUNT_IN
+	lesson_bars_remaining = COUNT_IN_BARS
 	phase = Phase.CALL
+	current_pattern = []
 	last_processed_step = -1
 	current_16th_position = 0
 	current_bar_start_step = 0
@@ -612,83 +724,42 @@ func start_practice() -> void:
 	expected_hit_beats.clear()
 	expected_hit_steps.clear()
 	player_hits.clear()
-	perfect_count = 0
-	good_count = 0
-	miss_count = 0
-	hit_error_acc = 0.0
-	total_hits = 0
+	_reset_pattern_stats()
+
+	if timing_indicator:
+		timing_indicator.visible = show_ticker
+
 	randomize()
 	_big_dog_next_switch = randf_range(1.0, 3.0)
 	_apply_phase_look_targets()
 	if big_dog and dog1_face_target:
 		big_dog.look_at_target = dog1_face_target
+
 	conductor.play()
-	_set_status_text("GET READY...", true)
+	_set_status_text("GET READY...", show_ticker)
 
-func _finish_free_bark() -> void:
-	_begin_dialogue_section(DialogueMode.PRACTICE_INTRO, [
-		"Call and response time.",
-		"I'll bark a beat — listen carefully.",
-		"Then you bark it back. Let's start simple."
-	])
-
-func _finish_practice() -> void:
-	_begin_dialogue_section(DialogueMode.MAIN_INTRO, [
-		"Nice work!",
-		"Same deal: listen to each pattern, then repeat it.",
-		"Ready for the real beats?"
-	])
-
-func start_main_game():
-	# Reset all stats
-	total_perfect_count = 0
-	total_good_count = 0
-	total_miss_count = 0
-	total_hit_error_acc = 0.0
-	total_hits_count = 0
-	
-	# Reset pattern progression
-	current_pattern_index = -3  # Start with 3 bars of padding
-	current_pattern = []  # Empty pattern for padding
+# Starts the CALL bar for lesson_patterns[lesson_pattern_index].
+func _begin_lesson_pattern(pattern_start_step: int) -> void:
 	phase = Phase.CALL
-	last_processed_step = -1
-	current_16th_position = 0
-	current_bar_start_step = 0
-	response_phase_start_beat = 0.0
-	response_phase_start_step = 0
-	expected_hit_beats.clear()
-	expected_hit_steps.clear()
-	player_hits.clear()
-	perfect_count = 0
-	good_count = 0
-	miss_count = 0
-	hit_error_acc = 0.0
-	total_hits = 0
-	
-	# Initialize look targets
-	randomize()
-	_big_dog_next_switch = randf_range(1.0, 3.0)
+	lesson_step = LessonStep.CALL
+	current_bar_start_step = pattern_start_step
+	current_pattern = lesson_patterns[lesson_pattern_index]
+	_initialize_beat_feedback()
+	_set_status_text("LISTEN!", show_ticker)
 	_apply_phase_look_targets()
-	
-	# Set initial big dog target (player face)
-	if big_dog and dog1_face_target and big_dog.has_method("set"):
-		big_dog.look_at_target = dog1_face_target
-	
-	# Create and start conductor
-	if conductor:
-		conductor.queue_free()
-		conductor = null
-	_ensure_conductor()
-	conductor.play()
-	
-	_set_status_text("GET READY...")
 
 func show_final_score():
 	var total_expected = 0
-	for pattern in drum_patterns:
-		for beat in pattern:
-			if beat == 1:
-				total_expected += 1
+	for lesson in lessons:
+		if not bool(lesson.get("graded", false)):
+			continue
+		var repeat: int = maxi(1, int(lesson.get("repeat", 1)))
+		var per_loop := 0
+		for pattern in lesson.get("patterns", []):
+			for beat in pattern:
+				if beat == 1:
+					per_loop += 1
+		total_expected += per_loop * repeat
 	
 	var accuracy: float = 0.0
 	if total_expected > 0:
@@ -715,22 +786,23 @@ func _single_line(text: String) -> String:
 	return text.replace("\n", " ").strip_edges()
 
 func _start_opening_dialogue() -> void:
-	_start_dialogue(DialogueMode.INTRO, [
-		"Hey pup. Know how to bark?",
-		"Hit SPACE and show me."
+	_start_dialogue(DialogueMode.OPENING, [
+		"Well well. Fresh pup smell.",
+		"I'm the Big Dog 'round here. That's Pip.",
+		"Rule one of the pack: BARK. Mash SPACE!"
 	])
 
 func _start_score_dialogue(grade: String, accuracy: float, mean_error: float) -> void:
-	var timing_text := "Avg timing: %.0f ms." % [mean_error * 1000.0]
+	var timing_text := "Snoot timing: %.0f ms off." % [mean_error * 1000.0]
 	if total_hits_count == 0:
-		timing_text = "No timed barks landed."
+		timing_text = "Not one bark landed. Bold."
 
 	_start_dialogue(DialogueMode.SCORE, [
-		"Last pattern done. Nice work.",
-		"Grade %s. %.0f%% accuracy." % [grade, accuracy * 100.0],
-		"Perfect %d  Good %d  Miss %d" % [total_perfect_count, total_good_count, total_miss_count],
+		"And... paws down. What a show.",
+		"Grade %s — %.0f%% good-dog accuracy." % [grade, accuracy * 100.0],
+		"Perfect %d, Good %d, Oops %d." % [total_perfect_count, total_good_count, total_miss_count],
 		timing_text,
-		"SPACE to try again."
+		"SPACE to run it back, good dog."
 	])
 
 func _start_dialogue(mode: DialogueMode, lines: Array[String]) -> void:
@@ -787,12 +859,10 @@ func _finish_dialogue() -> void:
 	dialogue_is_typing = false
 
 	match finished_mode:
-		DialogueMode.INTRO:
+		DialogueMode.OPENING:
 			change_state(GameState.FREE_BARK)
-		DialogueMode.PRACTICE_INTRO:
-			change_state(GameState.PRACTICE)
-		DialogueMode.MAIN_INTRO:
-			change_state(GameState.MAIN_GAME)
+		DialogueMode.LESSON_INTRO:
+			change_state(GameState.LESSON)
 		DialogueMode.SCORE:
 			get_tree().reload_current_scene()
 
@@ -817,17 +887,17 @@ func _previous_dialogue_character() -> String:
 func _is_word_character(character: String) -> bool:
 	return character != "" and character != " " and character != "\n" and character != "\t"
 
-func _set_status_text(text: String, show_ticker: Variant = null) -> void:
-	# Reuse the dialogue box to show in-game status (LISTEN / REPEAT / etc.).
+func _set_status_text(text: String, ticker_visible: Variant = null) -> void:
+	# Reuse the dialogue box to show in-game status (LISTEN / YOUR TURN / etc.).
 	dialogue_mode = DialogueMode.NONE
 	dialogue_is_typing = false
 	if dialogue_ui:
 		dialogue_ui.visible = true
 	if timing_indicator:
-		if show_ticker == null:
-			timing_indicator.visible = current_state not in [GameState.INTRO, GameState.SCORE, GameState.FREE_BARK]
+		if ticker_visible == null:
+			timing_indicator.visible = current_state == GameState.LESSON and show_ticker
 		else:
-			timing_indicator.visible = show_ticker
+			timing_indicator.visible = bool(ticker_visible)
 	if dialogue_text_label:
 		dialogue_text_label.text = _single_line(text)
 		_fit_dialogue_width(text)
@@ -923,12 +993,12 @@ func _process(delta):
 	match current_state:
 		GameState.INTRO, GameState.SCORE:
 			_update_dialogue(delta)
-		GameState.FREE_BARK, GameState.PRACTICE, GameState.MAIN_GAME:
-			if current_state == GameState.MAIN_GAME:
+		GameState.FREE_BARK, GameState.LESSON:
+			if current_state == GameState.LESSON:
 				handle_restart_logic(delta)
 			_update_rhythm()
 			_update_big_dog_look(delta)
-			if current_state != GameState.FREE_BARK:
+			if current_state == GameState.LESSON and show_ticker:
 				_update_timing_indicator()
 
 func handle_restart_logic(delta):
@@ -999,21 +1069,18 @@ func _update_rhythm() -> void:
 	while last_processed_step < scheduler_step:
 		last_processed_step += 1
 		_on_sixteenth_pass(last_processed_step)
-		if current_state not in [GameState.FREE_BARK, GameState.PRACTICE, GameState.MAIN_GAME]:
+		if current_state not in [GameState.FREE_BARK, GameState.LESSON]:
 			break
 
-	if phase == Phase.RESPONSE and current_state in [GameState.PRACTICE, GameState.MAIN_GAME]:
+	if phase == Phase.RESPONSE and current_state == GameState.LESSON:
 		_check_missed_notes()
 
 func _on_sixteenth_pass(absolute_step: int) -> void:
 	if current_state == GameState.FREE_BARK:
 		_on_free_bark_step(absolute_step)
 		return
-	if current_state == GameState.PRACTICE:
-		_on_practice_step(absolute_step)
-		return
 
-	_on_main_game_step(absolute_step)
+	_on_lesson_step(absolute_step)
 
 func _on_free_bark_step(absolute_step: int) -> void:
 	var step_position := conductor.get_step_in_bar(absolute_step) if conductor else int(posmod(absolute_step, STEPS_PER_BAR))
@@ -1027,117 +1094,59 @@ func _on_free_bark_step(absolute_step: int) -> void:
 		if free_bark_bars_remaining <= 0:
 			_finish_free_bark()
 
-func _on_practice_step(absolute_step: int) -> void:
+func _on_lesson_step(absolute_step: int) -> void:
 	var step_position := conductor.get_step_in_bar(absolute_step) if conductor else int(posmod(absolute_step, STEPS_PER_BAR))
 	current_16th_position = step_position
 
+	# Every dog bounces on each beat (positions 0, 4, 8, 12).
 	if step_position % STEPS_PER_BEAT == 0:
 		_all_dogs_bump()
 
-	if not practice_active:
-		if step_position == STEPS_PER_BAR - 1:
-			practice_ready_bars_remaining -= 1
-			if practice_ready_bars_remaining <= 0:
-				practice_active = true
-				_initialize_beat_feedback()
-				_set_status_text("LISTEN!", true)
-		return
+	var bar_ended := step_position == STEPS_PER_BAR - 1
 
-	if phase == Phase.CALL:
-		if current_pattern.size() > step_position and current_pattern[step_position] == 1:
-			_dog_bark(big_dog)
-			beat_revealed[step_position] = true
+	match lesson_step:
+		LessonStep.COUNT_IN:
+			# Let the player feel a bar of pulse before the first call.
+			if bar_ended:
+				lesson_bars_remaining -= 1
+				if lesson_bars_remaining <= 0:
+					_begin_lesson_pattern(absolute_step + 1)
 
-		if step_position == STEPS_PER_BAR - 1:
-			phase = Phase.RESPONSE
-			_setup_response_phase(absolute_step + 1)
-			_set_status_text("REPEAT!", true)
-			_apply_phase_look_targets()
-	else:
-		if current_pattern.size() > step_position and current_pattern[step_position] == 1:
-			_dog_bark(dog2)
-
-		if step_position == STEPS_PER_BAR - 1:
-			_evaluate_player_enhanced()
-			practice_rounds_remaining -= 1
-			if practice_rounds_remaining <= 0:
-				_finish_practice()
-			else:
-				phase = Phase.CALL
-				current_bar_start_step = absolute_step + 1
-				_initialize_beat_feedback()
-				_set_status_text("LISTEN!", true)
+		LessonStep.CALL:
+			# Big Dog demonstrates the pattern.
+			if current_pattern.size() > step_position and current_pattern[step_position] == 1:
+				_dog_bark(big_dog)
+				beat_revealed[step_position] = true
+			if bar_ended:
+				phase = Phase.RESPONSE
+				lesson_step = LessonStep.RESPONSE
+				_setup_response_phase(absolute_step + 1)
+				_set_status_text("YOUR TURN!", show_ticker)
 				_apply_phase_look_targets()
 
-func _on_main_game_step(absolute_step: int) -> void:
-	var step_position := conductor.get_step_in_bar(absolute_step) if conductor else int(posmod(absolute_step, STEPS_PER_BAR))
-	current_16th_position = step_position
+		LessonStep.RESPONSE:
+			# Pip barks along so the player knows the timing.
+			if current_pattern.size() > step_position and current_pattern[step_position] == 1:
+				_dog_bark(dog2)
+			if bar_ended:
+				_evaluate_player_enhanced()
+				lesson_pattern_index += 1
+				if lesson_pattern_index >= lesson_patterns.size():
+					phase = Phase.CALL
+					lesson_step = LessonStep.OUTRO
+					lesson_bars_remaining = OUTRO_BARS
+					# Hide the ticker during the "GOOD DOG!" breather — no pattern is playing.
+					_set_status_text("GOOD DOG!", false)
+					_apply_phase_look_targets()
+				else:
+					_begin_lesson_pattern(absolute_step + 1)
 
-	# All dogs bump on every beat (positions 0, 4, 8, 12)
-	if step_position % STEPS_PER_BEAT == 0:
-		_all_dogs_bump()
-	
-	# Handle padding phases
-	if current_pattern_index < 0:
-		# Start padding phase
-		if step_position == STEPS_PER_BAR - 1:
-			current_pattern_index += 1
-			if current_pattern_index == 0:
-				# Start first actual pattern
-				_start_next_pattern(absolute_step + 1)
-		return
-	elif current_pattern_index >= drum_patterns.size():
-		# End padding phase
-		if step_position == STEPS_PER_BAR - 1:
-			current_pattern_index += 1
-			if current_pattern_index >= drum_patterns.size() + 2:
-				# End padding complete - go to score screen
-				change_state(GameState.SCORE)
-		return
-	
-	if phase == Phase.CALL:
-		# Computer plays pattern (big dog)
-		if current_pattern.size() > step_position and current_pattern[step_position] == 1:
-			_dog_bark(big_dog)
-			# Reveal this beat position on the clock
-			beat_revealed[step_position] = true
-
-		# End of bar – switch to RESPONSE
-		if step_position == STEPS_PER_BAR - 1:
-			phase = Phase.RESPONSE
-			_setup_response_phase(absolute_step + 1)
-			_set_status_text("REPEAT!")
-			_apply_phase_look_targets()
-	else:
-		# Helper dog barks pattern to guide player
-		if current_pattern.size() > step_position and current_pattern[step_position] == 1:
-			_dog_bark(dog2)
-
-		# Response phase – check for bar completion
-		if step_position == STEPS_PER_BAR - 1:
-			_evaluate_player_enhanced()
-			# Check if we've completed all patterns
-			if current_pattern_index >= drum_patterns.size() - 1:
-				# Start end padding
-				current_pattern_index += 1
-				current_pattern = []  # Empty pattern for padding
-				phase = Phase.CALL
-				current_bar_start_step = absolute_step + 1
-				_set_status_text("WELL DONE!")
-				_apply_phase_look_targets()
-			else:
-				# Prepare for next pattern
-				current_pattern_index += 1
-				_start_next_pattern(absolute_step + 1)
-
-func _start_next_pattern(pattern_start_step: int) -> void:
-	"""Prepares the state for the next pattern."""
-	phase = Phase.CALL
-	current_bar_start_step = pattern_start_step
-	current_pattern = drum_patterns[current_pattern_index]
-	_initialize_beat_feedback()  # Initialize for new pattern
-	_set_status_text("LISTEN!")
-	_apply_phase_look_targets()
+		LessonStep.OUTRO:
+			# A breath before the next lesson's dialogue.
+			if bar_ended:
+				lesson_bars_remaining -= 1
+				if lesson_bars_remaining <= 0:
+					_advance_to_next_lesson()
 
 func _setup_response_phase(response_start_step: int) -> void:
 	"""Setup expected hit timings for the response phase"""
@@ -1322,18 +1331,19 @@ func _evaluate_player_enhanced() -> void:
 	if total_hits > 0:
 		mean_error = hit_error_acc / total_hits
 	
-	print("=== PATTERN %d RESULTS ===" % current_pattern_index)
+	print("=== LESSON %d PATTERN %d RESULTS ===" % [current_lesson_index, lesson_pattern_index])
 	print("Perfect: %d, Good: %d, Miss: %d" % [perfect_count, good_count, miss_count])
 	print("Accuracy: %.1f%% (%d/%d)" % [accuracy * 100.0, perfect_count + good_count, total_expected])
 	print("Mean timing error: %.1fms" % (mean_error * 1000))
 	print("========================")
 	
-	# Add to total stats
-	total_perfect_count += perfect_count
-	total_good_count += good_count
-	total_miss_count += miss_count
-	total_hit_error_acc += hit_error_acc
-	total_hits_count += total_hits
+	# Only the final graded lesson counts toward the score.
+	if lesson_graded:
+		total_perfect_count += perfect_count
+		total_good_count += good_count
+		total_miss_count += miss_count
+		total_hit_error_acc += hit_error_acc
+		total_hits_count += total_hits
 	
 	# Reset per-pattern stats
 	perfect_count = 0
@@ -1370,7 +1380,7 @@ func _on_primary_press() -> void:
 			_advance_dialogue()
 		GameState.FREE_BARK:
 			_handle_free_bark_input()
-		GameState.PRACTICE, GameState.MAIN_GAME:
+		GameState.LESSON:
 			if conductor:
 				_hit_scoring_beat = _audio_beat()
 			_handle_player_input()
