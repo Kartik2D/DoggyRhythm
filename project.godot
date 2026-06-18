@@ -8,16 +8,17 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="callandresponse"
 run/main_scene="uid://cusj6xnmlw825"
-config/features=PackedStringArray("4.4", "Forward Plus")
+config/features=PackedStringArray("4.6", "Forward Plus")
+boot_splash/show_image=false
 config/icon="res://icon.svg"
-
-[autoload]
-
-DialogueManager="*res://addons/dialogue_manager/dialogue_manager.gd"
 
 [dialogue_manager]
 
@@ -28,10 +29,12 @@ runtime/balloon_path="res:///balloon.tscn"
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/vsync/vsync_mode=0
+window/background/color=Color(0, 0, 0, 1)
 
-[editor_plugins]
+[editor]
 
-enabled=PackedStringArray("res://addons/dialogue_manager/plugin.cfg")
+movie_writer/movie_file="/Users/kartikvinayak/desktop/test.avi"
+movie_writer/disable_vsync=true
 
 [internationalization]
 

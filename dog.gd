@@ -24,6 +24,10 @@ extends Node3D
 # Action Strengths
 @export_group("Action Strengths")
 @export var bark_strength: float = 25.0
+@export var beat_bump: float = 0.075
+@export var beat_pop_decay: float = 0.55
+@export var bark_bump: float = 0.33
+@export var pop_decay: float = 1.45
 @export var bump_strength: float = 10.0
 @export var jiggle_strength: float = 15.0
 
@@ -53,8 +57,17 @@ class SpringPart:
 		target_rotation = rest_rotation
 
 var parts: Dictionary = {}
+var _rest_scale: Vector3 = Vector3.ONE
+var _rest_position: Vector3 = Vector3.ZERO
+var _bark_pivot: Vector3 = Vector3.ZERO
+var _pop := Vector3.ZERO
+var _beat_pop := Vector3.ZERO
+
 
 func _ready():
+	_rest_scale = scale
+	_rest_position = position
+	_bark_pivot = body_pivot.position if body_pivot else Vector3(0, 1.1, 0)
 	# Initialize all parts
 	if head_pivot: 
 		parts["head"] = SpringPart.new(head_pivot)
@@ -69,14 +82,86 @@ func _ready():
 	if body_pivot: parts["body"] = SpringPart.new(body_pivot)
 	if tail_pivot: parts["tail"] = SpringPart.new(tail_pivot)
 
+const MAX_SIM_STEP := 1.0 / 30.0
+
 func _process(delta: float):
+	# Clamp the timestep so a single frame spike (e.g. the audio/UI hitch when a
+	# song first starts) can't fling the springs and snap the head look-at.
+	var step := minf(delta, MAX_SIM_STEP)
+
 	# Update look at target - just set the target position
 	if look_at_target and parts.has("head"):
 		parts["head"].target_look_position = look_at_target.global_position
 	
 	# Update all springs
 	for part in parts.values():
-		update_spring(part, delta)
+		update_spring(part, step)
+
+	_update_pop(step)
+
+func _update_pop(delta: float) -> void:
+	var bark_step := pop_decay * delta
+	_pop.x = _decay_toward_zero(_pop.x, bark_step)
+	_pop.y = _decay_toward_zero(_pop.y, bark_step)
+	_pop.z = _decay_toward_zero(_pop.z, bark_step)
+
+	var beat_step := beat_pop_decay * delta
+	_beat_pop.x = _decay_toward_zero(_beat_pop.x, beat_step)
+	_beat_pop.y = _decay_toward_zero(_beat_pop.y, beat_step)
+	_beat_pop.z = _decay_toward_zero(_beat_pop.z, beat_step)
+
+	var combined := _pop + _beat_pop
+	if combined == Vector3.ZERO:
+		scale = _rest_scale
+		position = _rest_position
+	else:
+		_apply_pop_scale(Vector3.ONE + combined)
+
+
+func _decay_toward_zero(value: float, step: float) -> float:
+	if value > 0.0:
+		return maxf(0.0, value - step)
+	if value < 0.0:
+		return minf(0.0, value + step)
+	return 0.0
+
+
+func _add_pop_bump(amount: float) -> void:
+	_pop.x += amount
+	_pop.y -= amount * 0.7
+	_pop.z += amount
+	_clamp_bark_pop()
+
+
+func _add_beat_pop_bump(amount: float) -> void:
+	_beat_pop.x += amount
+	_beat_pop.y -= amount * 0.7
+	_beat_pop.z += amount
+	_clamp_beat_pop()
+
+
+func _clamp_bark_pop() -> void:
+	var y_min := -bark_bump * 0.7
+	_pop.x = clampf(_pop.x, 0.0, bark_bump)
+	_pop.y = clampf(_pop.y, y_min, 0.0)
+	_pop.z = clampf(_pop.z, 0.0, bark_bump)
+
+
+func _clamp_beat_pop() -> void:
+	var y_min := -beat_bump * 0.7
+	_beat_pop.x = clampf(_beat_pop.x, 0.0, beat_bump)
+	_beat_pop.y = clampf(_beat_pop.y, y_min, 0.0)
+	_beat_pop.z = clampf(_beat_pop.z, 0.0, beat_bump)
+
+
+func _apply_pop_scale(factor: Vector3) -> void:
+	var target_scale := _rest_scale * factor
+	scale = target_scale
+	position = _rest_position + Vector3(
+		_bark_pivot.x * (_rest_scale.x - target_scale.x),
+		_bark_pivot.y * (_rest_scale.y - target_scale.y),
+		_bark_pivot.z * (_rest_scale.z - target_scale.z)
+	)
 
 func update_spring(part: SpringPart, delta: float):
 	if part.use_look_at:
@@ -155,29 +240,26 @@ func reset_all_targets():
 		part.target_rotation = part.rest_rotation
 
 # Actions
-func bark(force_multiplier: float = 1.0):
+func bark(force_multiplier: float = 1.0) -> void:
 	bark_sound.pitch_scale = pitch * randf_range(0.9, 1.2)
 	bark_sound.play()
-	
-	var strength = bark_strength * force_multiplier
-	
-	# Head looks up slightly (impulse in world space)
+	_apply_bark_animation(force_multiplier)
+	_add_pop_bump(bark_bump * force_multiplier)
+
+
+func beat_bounce() -> void:
+	_add_beat_pop_bump(beat_bump)
+
+
+func _apply_bark_animation(force_multiplier: float = 1.0) -> void:
+	var strength := bark_strength * force_multiplier
+
 	add_impulse("head", Vector3(randf_range(-0.2, 0.2), randf_range(0.3, 0.6), randf_range(-0.1, 0.1)) * strength * 0.1)
-	
-	# Bottom snout opens (down)
-	add_impulse("snout", Vector3(-2.0, randf_range(-0.2, 0.2), 0) * strength * 1.5)
-	
-	# Upper snout/nose lifts slightly
-	add_impulse("snout2", Vector3(1.5, randf_range(-0.1, 0.1), 0) * strength * 1.5)
-	
-	# Ears perk up
-	add_impulse("left_ear", Vector3(0, 0, randf_range(-0.3, 0.3)) * strength * 0.6)
-	add_impulse("right_ear", Vector3(0, 0, randf_range(-0.3, 0.3)) * strength * 0.6)
-	
-	# Body bounces slightly
-	add_impulse("body", Vector3(randf_range(-0.2, 0.2), 0, randf_range(-0.1, 0.1)) * strength * 0.3)
-	
-	# Tail wags enthusiastically
+	add_impulse("snout", Vector3(-2.0, randf_range(-0.2, 0.2), 0.0) * strength * 1.5)
+	add_impulse("snout2", Vector3(1.5, randf_range(-0.1, 0.1), 0.0) * strength * 1.5)
+	add_impulse("left_ear", Vector3(0.0, 0.0, randf_range(-0.3, 0.3)) * strength * 0.6)
+	add_impulse("right_ear", Vector3(0.0, 0.0, randf_range(-0.3, 0.3)) * strength * 0.6)
+	add_impulse("body", Vector3(randf_range(-0.2, 0.2), 0.0, randf_range(-0.1, 0.1)) * strength * 0.3)
 	add_impulse("tail", Vector3(randf_range(0.1, 0.3), randf_range(0.7, 1.0), randf_range(-0.1, 0.1)) * strength * 0.8)
 
 func bump(force_multiplier: float = 3.0):

@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://cusj6xnmlw825"]
+[gd_scene format=3 uid="uid://cusj6xnmlw825"]
 
 [ext_resource type="Script" uid="uid://02cicn75e2x2" path="res://toplev.gd" id="1_h2yge"]
 [ext_resource type="PackedScene" uid="uid://dgtgit8yqfqbw" path="res://dog.tscn" id="3_dog"]
@@ -119,7 +119,7 @@ shader = SubResource("Shader_h2yge")
 [sub_resource type="PlaneMesh" id="PlaneMesh_7mycd"]
 lightmap_size_hint = Vector2i(12, 12)
 
-[node name="Control" type="Control"]
+[node name="Control" type="Control" unique_id=1999972553]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -127,9 +127,8 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_h2yge")
-input_latency_ms = 20.0
 
-[node name="SubViewportContainer" type="SubViewportContainer" parent="."]
+[node name="SubViewportContainer" type="SubViewportContainer" parent="." unique_id=1865590338]
 texture_filter = 1
 layout_mode = 1
 anchors_preset = 15
@@ -140,54 +139,54 @@ grow_vertical = 2
 stretch = true
 stretch_shrink = 5
 
-[node name="SubViewport" type="SubViewport" parent="SubViewportContainer"]
+[node name="SubViewport" type="SubViewport" parent="SubViewportContainer" unique_id=441599225]
 handle_input_locally = false
 size = Vector2i(230, 129)
 render_target_update_mode = 4
 
-[node name="Node3D" type="Node3D" parent="SubViewportContainer/SubViewport"]
+[node name="Node3D" type="Node3D" parent="SubViewportContainer/SubViewport" unique_id=163822481]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport/Node3D"]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="SubViewportContainer/SubViewport/Node3D" unique_id=2063757809]
 transform = Transform3D(0.657787, -0.750842, 0.0595996, 0.355694, 0.379409, 0.854125, -0.663926, -0.540634, 0.516641, 0, 0, 0.86435)
 light_energy = 0.4
 shadow_enabled = true
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewportContainer/SubViewport/Node3D"]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="SubViewportContainer/SubViewport/Node3D" unique_id=767432657]
 environment = SubResource("Environment_5vw27")
 
-[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport/Node3D"]
-transform = Transform3D(1, 0, 0, 0, 0.853651, 0.520846, 0, -0.520846, 0.853651, 0, 4.0181, 5.31666)
+[node name="Camera3D" type="Camera3D" parent="SubViewportContainer/SubViewport/Node3D" unique_id=1488956248]
+transform = Transform3D(1, 0, 0, 0, 0.8642836, 0.50300485, 0, -0.50300485, 0.8642836, 0, 3.915564, 5.3856153)
 fov = 45.0
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/Node3D/Camera3D"]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="SubViewportContainer/SubViewport/Node3D/Camera3D" unique_id=1952339077]
 transform = Transform3D(2, 0, 0, 0, -8.9407e-08, -2, 0, 2, -8.9407e-08, 0, -0.0843172, -1.40431)
 visible = false
 material_override = SubResource("ShaderMaterial_lquwl")
 mesh = SubResource("PlaneMesh_7mycd")
 
-[node name="looktarget" type="Node3D" parent="SubViewportContainer/SubViewport/Node3D"]
+[node name="looktarget" type="Node3D" parent="SubViewportContainer/SubViewport/Node3D" unique_id=1027257137]
 transform = Transform3D(0.809859, 0.540578, 0.227824, -0.555178, 0.831731, 2.80724e-09, -0.189488, -0.126483, 0.973702, 0, 2.87696, 4.05262)
 
-[node name="Dog1FaceTarget" type="Node3D" parent="SubViewportContainer/SubViewport/Node3D"]
+[node name="Dog1FaceTarget" type="Node3D" parent="SubViewportContainer/SubViewport/Node3D" unique_id=1670480517]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2, 1.2, 1.5)
 
-[node name="Dog2FaceTarget" type="Node3D" parent="SubViewportContainer/SubViewport/Node3D"]
+[node name="Dog2FaceTarget" type="Node3D" parent="SubViewportContainer/SubViewport/Node3D" unique_id=332099603]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2, 1.2, 1.5)
 
-[node name="Dog1" parent="SubViewportContainer/SubViewport/Node3D" node_paths=PackedStringArray("look_at_target") instance=ExtResource("3_dog")]
+[node name="Dog1" parent="SubViewportContainer/SubViewport/Node3D" unique_id=423215968 node_paths=PackedStringArray("look_at_target") instance=ExtResource("3_dog")]
 transform = Transform3D(-0.404312, 0, 0.914621, 0, 1, 0, -0.914621, 0, -0.404312, -2, 0, 2)
 look_at_target = NodePath("../looktarget")
 
-[node name="Dog2" parent="SubViewportContainer/SubViewport/Node3D" node_paths=PackedStringArray("look_at_target") instance=ExtResource("3_dog")]
+[node name="Dog2" parent="SubViewportContainer/SubViewport/Node3D" unique_id=81781202 node_paths=PackedStringArray("look_at_target") instance=ExtResource("3_dog")]
 transform = Transform3D(-0.352054, 0, -0.93598, 0, 1, 0, 0.93598, 0, -0.352054, 2, 0, 2)
 look_at_target = NodePath("../looktarget")
 
-[node name="BigDog" parent="SubViewportContainer/SubViewport/Node3D" node_paths=PackedStringArray("look_at_target") instance=ExtResource("3_dog")]
+[node name="BigDog" parent="SubViewportContainer/SubViewport/Node3D" unique_id=1832373691 node_paths=PackedStringArray("look_at_target") instance=ExtResource("3_dog")]
 transform = Transform3D(1.3, 0, 0, 0, 1.3, 0, 0, 0, 1.3, 0, 0.105006, -0.0994864)
 pitch = 0.6
 look_at_target = NodePath("../looktarget")
 
-[node name="statuslabel" type="Label" parent="SubViewportContainer/SubViewport"]
+[node name="statuslabel" type="Label" parent="SubViewportContainer/SubViewport" unique_id=1713792341]
 anchors_preset = 10
 anchor_right = 1.0
 offset_bottom = 23.0
@@ -197,7 +196,7 @@ text = "...
 horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="Label2" type="Label" parent="SubViewportContainer/SubViewport"]
+[node name="Label2" type="Label" parent="SubViewportContainer/SubViewport" unique_id=1836290764]
 anchors_preset = 9
 anchor_bottom = 1.0
 offset_right = 54.0
@@ -206,6 +205,6 @@ text = "you"
 horizontal_alignment = 1
 vertical_alignment = 2
 
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="."]
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=259288582]
 stream = ExtResource("4_1bvp3")
 volume_db = -6.063

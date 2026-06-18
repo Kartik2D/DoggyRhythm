@@ -1,4 +1,4 @@
-## Accurately tracks the current beat of a song.
+## Tracks a continuous beat clock synced to audio playback.
 class_name Conductor
 extends Node
 
@@ -6,12 +6,9 @@ extends Node
 ## [code]false[/code] resumes the song.
 @export var is_paused: bool = false:
 	get:
-		if player:
-			return player.stream_paused
-		return false
+		return _is_paused
 	set(value):
-		if player:
-			player.stream_paused = value
+		set_paused(value)
 
 @export_group("Nodes")
 ## The song player.
@@ -23,138 +20,217 @@ extends Node
 ## Offset (in milliseconds) of when the 1st beat of the song is in the audio
 ## file. [code]5000[/code] means the 1st beat happens 5 seconds into the track.
 @export var first_beat_offset_ms: int = 0
+## Beats in one bar.
+@export var beats_per_bar: int = 4
+## Beat subdivisions used by the game scheduler.
+@export var steps_per_beat: int = 4
 
-@export_group("Filter Parameters")
-## [code]cutoff[/code] for the 1€ filter. Decrease to reduce jitter.
-@export var allowed_jitter: float = 0.1
-## [code]beta[/code] for the 1€ filter. Increase to reduce lag.
-@export var lag_reduction: float = 5
+const CLOCK_EPSILON := 0.00001
+const LOOP_WRAP_THRESHOLD_SEC := 0.25
 
-# Calling this is expensive, so cache the value. This should not change.
-var _cached_output_latency: float = AudioServer.get_output_latency()
-
-# General conductor state
 var _is_playing: bool = false
-
-# Audio thread state
-var _song_time_audio: float = -100
-
-# System time state
-var _song_time_begin: float = 0
-var _song_time_system: float = -100
-
-# Filtered time state
-var _filter: OneEuroFilter
-var _filtered_audio_system_delta: float = 0
+var _is_paused: bool = false
+var _anchor_song_time: float = 0.0
+var _loop_carry_time: float = 0.0
+var _stream_length: float = 0.0
+var _prev_raw_playback: float = 0.0
+var _cached_output_latency: float = 0.0
+var _use_web_clock: bool = false
+var _play_started_usec: int = 0
+var _web_align_shift_sec: float = 0.0
+var _web_clock_aligned: bool = false
 
 
 func _ready() -> void:
-	# Ensure that playback state is always updating, otherwise the smoothing
-	# filter causes issues.
 	process_mode = Node.PROCESS_MODE_ALWAYS
-
-
-func _process(_delta: float) -> void:
-	if not _is_playing:
-		return
-
-	# Handle a web bug where AudioServer.get_time_since_last_mix() occasionally
-	# returns unsigned 64-bit integer max value. This is likely due to minor
-	# timing issues between the main/audio threads, thus causing an underflow
-	# in the engine code.
-	var last_mix := AudioServer.get_time_since_last_mix()
-	if last_mix > 1000:
-		last_mix = 0
-
-	# First, calculate the song time using data from the audio thread. This
-	# value is very jittery, but will always match what the player is hearing.
-	_song_time_audio = (
-		player.get_playback_position()
-		# The 1st beat may not start at second 0 of the audio track. Compensate
-		# with an offset setting.
-		- first_beat_offset_ms / 1000.0
-		# For most platforms, the playback position value updates in chunks,
-		# with each chunk being one "mix". Smooth this out by adding in the time
-		# since the last chunk was processed.
-		+ last_mix
-		# Current processed audio is heard later.
-		- _cached_output_latency
-	)
-
-	# Next, calculate the song time using the system clock at render rate. This
-	# value is very stable, but can drift from the playing audio due to pausing,
-	# stuttering, etc.
-	_song_time_system = (Time.get_ticks_usec() / 1000000.0) - _song_time_begin
-	_song_time_system *= player.pitch_scale
-
-	# We don't do anything else here. Check _physics_process next.
-
-
-func _physics_process(delta: float) -> void:
-	if not _is_playing:
-		return
-
-	# To have the best of both the audio-based time and system-based time, we
-	# apply a smoothing filter (1€ filter) on the delta between the two values,
-	# then add it to the system-based time. This allows us to have a stable
-	# value that is also always accurate to what the player hears.
-	#
-	# Notes:
-	# - The 1€ filter jitter reduction is more effective on values that don't
-	#   change drastically between samples, so we filter on the delta (generally
-	#   less variable between frames) rather than the time itself.
-	# - We run the filter step in _physics_process to reduce the variability of
-	#   different systems' update rates. The filter params are specifically
-	#   tuned for 60 UPS.
-	var audio_system_delta := _song_time_audio - _song_time_system
-	_filtered_audio_system_delta = _filter.filter(audio_system_delta, delta)
-
-	# Uncomment this to show the difference between raw and filtered time.
-	#var song_time := _song_time_system + _filtered_audio_system_delta
-	#print("Error: %+.1f ms" % [abs(song_time - _song_time_audio) * 1000.0])
+	_use_web_clock = OS.has_feature("web")
 
 
 func play() -> void:
-	var filter_args := {
-		"cutoff": allowed_jitter,
-		"beta": lag_reduction,
-	}
-	_filter = OneEuroFilter.new(filter_args)
+	if player == null:
+		push_warning("Conductor.play() called without an AudioStreamPlayer.")
+		return
 
-	player.play()
+	_reset_clock_state()
+	_cached_output_latency = AudioServer.get_output_latency()
+	_stream_length = _get_stream_length()
+	_play_started_usec = Time.get_ticks_usec()
 	_is_playing = true
+	_is_paused = false
 
-	# Capture the start of the song using the system clock.
-	_song_time_begin = (
-		Time.get_ticks_usec() / 1000000.0
-		# The 1st beat may not start at second 0 of the audio track. Compensate
-		# with an offset setting.
-		+ first_beat_offset_ms / 1000.0
-		# Playback does not start immediately, but only when the next audio
-		# chunk is processed (the "mix" step). Add in the time until that
-		# happens.
-		+ AudioServer.get_time_to_next_mix()
-		# Add in additional output latency.
-		+ _cached_output_latency
-	)
+	player.stream_paused = false
+	player.play()
 
 
 func stop() -> void:
-	player.stop()
+	if player:
+		player.stop()
 	_is_playing = false
+	_is_paused = false
+	_reset_clock_state()
 
 
-## Returns the current beat of the song.
+func set_paused(value: bool) -> void:
+	if value == _is_paused:
+		return
+
+	if value:
+		_anchor_song_time = _compute_heard_song_time()
+
+	_is_paused = value
+	if player:
+		player.stream_paused = value
+
+
+## Returns continuous heard song time in seconds (what the ticker should show).
+func get_song_time() -> float:
+	if not _is_playing:
+		return 0.0
+	if _is_paused:
+		return _anchor_song_time
+	return _compute_heard_song_time()
+
+
+## Mix-head song time — schedule gameplay sounds here so they are heard on the beat.
+func get_mix_song_time() -> float:
+	if not _is_playing:
+		return 0.0
+	if _is_paused:
+		return _anchor_song_time + _cached_output_latency
+	return _compute_mix_song_time()
+
+
+## Returns the current heard beat of the song.
 func get_current_beat() -> float:
-	var song_time := _song_time_system + _filtered_audio_system_delta
-	return song_time / get_beat_duration()
+	return get_song_time() / get_beat_duration()
 
 
-## Returns the current beat of the song without smoothing.
+func get_mix_current_beat() -> float:
+	return get_mix_song_time() / get_beat_duration()
+
+
+## Returns the current beat of the song. Kept for compatibility.
 func get_current_beat_raw() -> float:
-	return _song_time_audio / get_beat_duration()
+	return get_current_beat()
+
+
+## Returns the absolute bar index.
+func get_current_bar() -> int:
+	return int(floor(get_current_beat() / beats_per_bar + CLOCK_EPSILON))
+
+
+## Returns the absolute sixteenth-step index for gameplay scheduling.
+func get_scheduler_step() -> int:
+	return int(floor(get_mix_current_beat() * steps_per_beat + CLOCK_EPSILON))
+
+
+## Returns the absolute sixteenth-step index from heard time.
+func get_current_step() -> int:
+	return int(floor(get_current_beat() * steps_per_beat + CLOCK_EPSILON))
+
+
+## Returns the current step within the bar.
+func get_step_in_bar(step: int) -> int:
+	return int(posmod(step, get_steps_per_bar()))
+
+
+## Returns the current step within the bar.
+func get_current_step_in_bar() -> int:
+	return get_step_in_bar(get_current_step())
+
+
+## Returns the beat value at an absolute step.
+func get_beat_for_step(step: int) -> float:
+	return step / float(steps_per_beat)
+
+
+## Returns the number of scheduler steps in one bar.
+func get_steps_per_bar() -> int:
+	return beats_per_bar * steps_per_beat
 
 
 ## Returns the duration of one beat (in seconds).
 func get_beat_duration() -> float:
-	return 60 / bpm
+	return 60.0 / bpm
+
+
+func _reset_clock_state() -> void:
+	_anchor_song_time = -first_beat_offset_ms / 1000.0
+	_loop_carry_time = 0.0
+	_prev_raw_playback = 0.0
+	_stream_length = 0.0
+	_play_started_usec = Time.get_ticks_usec()
+	_web_align_shift_sec = 0.0
+	_web_clock_aligned = false
+
+
+func _get_stream_length() -> float:
+	if player == null or player.stream == null:
+		return 0.0
+	return player.stream.get_length()
+
+
+func _pitch_scale() -> float:
+	return player.pitch_scale if player else 1.0
+
+
+func _wall_elapsed_sec() -> float:
+	return maxf((Time.get_ticks_usec() - _play_started_usec) / 1000000.0 * _pitch_scale(), 0.0)
+
+
+func _compute_heard_song_time() -> float:
+	var heard := _compute_mix_song_time() - _cached_output_latency
+	if heard < 0.0:
+		heard = 0.0
+	return heard
+
+
+func _compute_mix_song_time() -> float:
+	if player == null:
+		return _anchor_song_time + _cached_output_latency
+
+	if _use_web_clock:
+		return _compute_web_mix_song_time()
+	return _compute_desktop_mix_song_time()
+
+
+func _compute_web_mix_song_time() -> float:
+	# Web: wall clock aligned to audio; mix head does not subtract output latency.
+	var playback := player.get_playback_position()
+	if playback > 0.0:
+		_maybe_advance_loop_carry(playback)
+		if not _web_clock_aligned:
+			var audio_mix := playback + AudioServer.get_time_since_last_mix()
+			_web_align_shift_sec = _wall_elapsed_sec() - maxf(audio_mix, 0.0)
+			_cached_output_latency = AudioServer.get_output_latency()
+			_web_clock_aligned = true
+
+	var mix := _wall_elapsed_sec() - _web_align_shift_sec
+	if mix < 0.0:
+		mix = 0.0
+
+	return _loop_carry_time + mix - first_beat_offset_ms / 1000.0
+
+
+func _compute_desktop_mix_song_time() -> float:
+	if not player.playing:
+		return _anchor_song_time + _cached_output_latency
+
+	var playback := player.get_playback_position()
+	var raw_mix := playback + AudioServer.get_time_since_last_mix()
+	_maybe_advance_loop_carry(playback)
+
+	return _loop_carry_time + raw_mix - first_beat_offset_ms / 1000.0
+
+
+func _maybe_advance_loop_carry(raw_playback: float) -> void:
+	if _stream_length <= 0.0:
+		_prev_raw_playback = raw_playback
+		return
+
+	var near_loop_end := _prev_raw_playback >= _stream_length - LOOP_WRAP_THRESHOLD_SEC
+	var wrapped_backward := raw_playback + LOOP_WRAP_THRESHOLD_SEC < _prev_raw_playback
+	if near_loop_end and wrapped_backward:
+		_loop_carry_time += _stream_length
+
+	_prev_raw_playback = raw_playback
